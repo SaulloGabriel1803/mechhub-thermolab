@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="pt-BR" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}ThermoLab | MechHub Módulo 04{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="{{ url_for('thermolab.static', filename='thermolab/style.css') }}" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body class="thermolab-body">
+
+<!-- Topbar de Comando -->
+<header class="mechhub-topbar d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <div class="d-flex align-items-center gap-3">
+        <a href="{{ url_for('thermolab.dashboard') }}" class="text-decoration-none d-flex align-items-center gap-2 text-white">
+            <span class="mechhub-brand-badge"><i class="bi bi-gear-wide-connected"></i>MechHub</span>
+            <span class="fw-bold tracking-tight" style="font-size: 0.95rem;">ThermoLab</span>
+        </a>
+        <span class="badge-module d-none d-md-inline-flex align-items-center gap-2">
+            <span class="status-dot"></span>
+            Módulo 04 • Análise Térmica
+        </span>
+    </div>
+    <div class="d-flex align-items-center gap-3 small">
+        <span class="d-none d-md-inline text-secondary">
+            Dupla 3: <strong class="text-white">Saullo Gabriel &amp; Otávio Silva</strong>
+        </span>
+        <a href="{{ url_for('thermolab.download_pdf_report') }}" class="btn btn-sm btn-outline-light border-secondary-subtle px-3">
+            <i class="bi bi-file-earmark-pdf text-warning me-1"></i>Exportar PDF
+        </a>
+    </div>
+</header>
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar Linear-Style -->
+        <aside class="col-lg-2 col-md-3 py-4 px-3 thermolab-sidebar d-flex flex-column justify-content-between">
+            <div>
+                <div class="sidebar-section-label">Workbench Térmico</div>
+                <nav class="nav flex-column mb-4">
+                    <a class="thermolab-nav-link {% if active_page == 'dashboard' %}active{% endif %}"
+                       href="{{ url_for('thermolab.dashboard') }}">
+                        <span class="nav-left"><i class="bi bi-grid-1x2"></i> Painel Geral</span>
+                        <span class="nav-index">00</span>
+                    </a>
+                    <a class="thermolab-nav-link {% if active_page == 'materials' %}active{% endif %}"
+                       href="{{ url_for('thermolab.materials') }}">
+                        <span class="nav-left"><i class="bi bi-layers"></i> Materiais</span>
+                        <span class="nav-index">01</span>
+                    </a>
+                    <a class="thermolab-nav-link {% if active_page == 'calculations' %}active{% endif %}"
+                       href="{{ url_for('thermolab.calculations') }}">
+                        <span class="nav-left"><i class="bi bi-calculator"></i> Cálculos</span>
+                        <span class="nav-index">2-5</span>
+                    </a>
+                    <a class="thermolab-nav-link {% if active_page == 'comparison' %}active{% endif %}"
+                       href="{{ url_for('thermolab.comparison') }}">
+                        <span class="nav-left"><i class="bi bi-bar-chart-steps"></i> Comparar</span>
+                        <span class="nav-index">06</span>
+                    </a>
+                    <a class="thermolab-nav-link {% if active_page == 'simulation' %}active{% endif %}"
+                       href="{{ url_for('thermolab.simulation') }}">
+                        <span class="nav-left"><i class="bi bi-thermometer-half"></i> Simulações</span>
+                        <span class="nav-index">07</span>
+                    </a>
+                    <a class="thermolab-nav-link {% if active_page == 'reports' %}active{% endif %}"
+                       href="{{ url_for('thermolab.reports') }}">
+                        <span class="nav-left"><i class="bi bi-file-earmark-bar-graph"></i> Relatórios</span>
+                        <span class="nav-index">08</span>
+                    </a>
+                </nav>
+            </div>
+
+            <div class="p-3 rounded-3 border border-secondary-subtle bg-dark bg-opacity-25 small">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="fw-semibold text-white" style="font-size: 0.78rem;">Motor Numérico</span>
+                    <span class="font-mono text-success" style="font-size: 0.7rem;">READY</span>
+                </div>
+                <div class="font-mono text-secondary" style="font-size: 0.72rem; line-height: 1.55;">
+                    Flask Blueprint<br>
+                    NumPy • Pandas<br>
+                    Plotly • ReportLab
+                </div>
+            </div>
+        </aside>
+
+        <!-- Área de Trabalho Principal -->
+        <main class="col-lg-10 col-md-9 py-4 px-4 px-xl-5">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show border-0 shadow-sm mb-3" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

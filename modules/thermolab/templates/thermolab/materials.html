@@ -1,0 +1,275 @@
+{% extends "thermolab/base_thermolab.html" %}
+{% block title %}Materiais Térmicos — ThermoLab{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end mb-4 gap-3">
+    <div>
+        <div class="font-mono text-warning small text-uppercase mb-1" style="letter-spacing: 0.08em;">
+            Funcionalidade 01 • Banco Termofísico
+        </div>
+        <h1 class="page-title mb-1 text-white">Catálogo de Materiais Térmicos</h1>
+        <p class="text-secondary mb-0 small">
+            Reconhecimento visual por liga, comparação instantânea de grandezas e envio direto para cálculo ou simulação.
+        </p>
+    </div>
+    <a href="{{ url_for('thermolab.download_materials_csv') }}" class="btn btn-outline-light border-secondary-subtle btn-sm px-3">
+        <i class="bi bi-filetype-csv text-success me-1"></i>Exportar CSV
+    </a>
+</div>
+
+<div class="row g-4">
+    <!-- Formulário de Cadastro -->
+    <div class="col-lg-4">
+        <div class="tl-card">
+            <div class="tl-card-header">
+                <i class="bi bi-plus-circle text-warning me-2"></i>Cadastrar Novo Material
+            </div>
+            <div class="p-3">
+                <form method="POST" action="{{ url_for('thermolab.materials') }}">
+                    <div class="mb-3">
+                        <label class="form-label">Nome do Material *</label>
+                        <input type="text" name="name" class="form-control" placeholder="Ex: Aço Inox AISI 316L" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Categoria *</label>
+                        <select name="category" class="form-select">
+                            <option value="Metálico">Metálico</option>
+                            <option value="Polimérico">Polimérico</option>
+                            <option value="Cerâmico">Cerâmico</option>
+                            <option value="Compósito">Compósito</option>
+                            <option value="Isolante">Isolante</option>
+                        </select>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Calor Espec. c [J/kg·K] *</label>
+                            <input type="number" step="any" min="0.0001" name="specific_heat" class="form-control font-mono" placeholder="500" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Condutiv. k [W/m·K] *</label>
+                            <input type="number" step="any" min="0.0001" name="thermal_conductivity" class="form-control font-mono" placeholder="16.2" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Coef. Dilatação Linear α *</label>
+                        <div class="input-group">
+                            <input type="number" step="any" min="1e-9" name="thermal_expansion" class="form-control font-mono" placeholder="16.0" required>
+                            <select name="alpha_scale" class="form-select font-mono" style="max-width: 145px;">
+                                <option value="1e-6" selected>×10⁻⁶ K⁻¹</option>
+                                <option value="direct">K⁻¹ (direto)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Densidade ρ [kg/m³] *</label>
+                            <input type="number" step="any" min="0.01" name="density" class="form-control font-mono" placeholder="7990" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">T_máx Limite [°C]</label>
+                            <input type="number" step="any" name="max_temp" class="form-control font-mono" placeholder="1375">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Aplicação / Observações</label>
+                        <textarea name="notes" rows="2" class="form-control" placeholder="Aplicação típica em engenharia mecânica..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-thermo w-100">
+                        <i class="bi bi-save me-1"></i>Salvar no Catálogo
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Listagem com Reconhecimento Visual e Ações Diretas -->
+    <div class="col-lg-8">
+        <div class="tl-card">
+            <div class="tl-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <span><i class="bi bi-table text-info me-2"></i>Materiais Ativos (<span class="font-mono">{{ materials|length }}</span>)</span>
+                <form method="GET" action="{{ url_for('thermolab.materials') }}" class="d-flex gap-2">
+                    <input type="text" name="q" value="{{ search_q }}" class="form-control form-control-sm" placeholder="Buscar material...">
+                    <select name="category" class="form-select form-select-sm" style="width: 145px;">
+                        <option value="">Todas categorias</option>
+                        {% for cat in categories %}
+                            <option value="{{ cat }}" {% if filter_cat == cat %}selected{% endif %}>{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-outline-light">Filtrar</button>
+                </form>
+            </div>
+            <div class="p-3 table-responsive">
+                <table class="table table-dark-tl table-striped table-hover align-middle mb-0 small">
+                    <thead>
+                        <tr>
+                            <th>Material</th>
+                            <th class="text-end">c [J/kg·K]</th>
+                            <th class="text-end">α [×10⁻⁶/K]</th>
+                            <th class="text-end">k [W/m·K]</th>
+                            <th class="text-end">ρ [kg/m³]</th>
+                            <th class="text-end">T_máx</th>
+                            <th class="text-end">Ações Rápidas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in materials %}
+                            {% set vis = mat_visual(m.name, m.category) %}
+                            {% set k_pct = ((m.thermal_conductivity / max_k) * 100) if max_k > 0 else 0 %}
+                            {% set a_pct = ((m.thermal_expansion / max_alpha) * 100) if max_alpha > 0 else 0 %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="mat-swatch" style="background: {{ vis.bg }};">{{ vis.code }}</span>
+                                        <div>
+                                            <div class="fw-semibold text-white">{{ m.name }}</div>
+                                            <div class="text-secondary" style="font-size: 0.72rem;">
+                                                {{ m.category }} • Difusividade: <span class="font-mono text-info">{{ "%.2f"|format(m.thermal_diffusivity * 1e6) }} mm²/s</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="text-end font-mono">{{ "%.1f"|format(m.specific_heat) }}</td>
+                                <td class="text-end font-mono" style="min-width: 92px;">
+                                    {{ "%.2f"|format(m.thermal_expansion * 1e6) }}
+                                    <div class="progress-micro">
+                                        <div class="progress-micro-bar bg-info" style="width: {{ [a_pct, 5]|max }}%;"></div>
+                                    </div>
+                                </td>
+                                <td class="text-end font-mono fw-semibold text-warning" style="min-width: 92px;">
+                                    {{ "%.3f"|format(m.thermal_conductivity) }}
+                                    <div class="progress-micro">
+                                        <div class="progress-micro-bar bg-warning" style="width: {{ [k_pct, 5]|max }}%;"></div>
+                                    </div>
+                                </td>
+                                <td class="text-end font-mono">{{ "%.0f"|format(m.density) }}</td>
+                                <td class="text-end font-mono">{{ "%.0f °C"|format(m.max_temp) if m.max_temp is not none else "—" }}</td>
+                                <td class="text-end text-nowrap">
+                                    <a href="{{ url_for('thermolab.calculations', material_id=m.id) }}"
+                                       class="btn btn-sm btn-outline-warning py-1 px-2 me-1" style="font-size: 0.73rem;"
+                                       title="Usar este material em Cálculos">
+                                        Calcular
+                                    </a>
+                                    <a href="{{ url_for('thermolab.simulation', material_id=m.id) }}"
+                                       class="btn btn-sm btn-outline-info py-1 px-2 me-1" style="font-size: 0.73rem;"
+                                       title="Simular variação de temperatura">
+                                        Simular
+                                    </a>
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-light border-secondary-subtle py-1 px-2 me-1 btn-edit-mat"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#editMaterialModal"
+                                            data-id="{{ m.id }}"
+                                            data-name="{{ m.name }}"
+                                            data-category="{{ m.category }}"
+                                            data-c="{{ m.specific_heat }}"
+                                            data-alpha="{{ m.thermal_expansion }}"
+                                            data-k="{{ m.thermal_conductivity }}"
+                                            data-density="{{ m.density }}"
+                                            data-maxtemp="{{ m.max_temp if m.max_temp is not none else '' }}"
+                                            data-notes="{{ m.notes or '' }}"
+                                            title="Editar">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <form method="POST" action="{{ url_for('thermolab.delete_material', material_id=m.id) }}" class="d-inline" onsubmit="return confirm('Confirma excluir {{ m.name }}?');">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2" title="Excluir">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center text-secondary py-5">
+                                    Nenhum material encontrado com os filtros aplicados.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Edição -->
+<div class="modal fade" id="editMaterialModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark border border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title"><i class="bi bi-pencil-square text-info me-2"></i>Editar Material Térmico</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <form id="editMaterialForm" method="POST">
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label">Nome</label>
+                        <input type="text" name="name" id="edit-name" class="form-control" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Categoria</label>
+                        <select name="category" id="edit-category" class="form-select">
+                            <option value="Metálico">Metálico</option>
+                            <option value="Polimérico">Polimérico</option>
+                            <option value="Cerâmico">Cerâmico</option>
+                            <option value="Compósito">Compósito</option>
+                            <option value="Isolante">Isolante</option>
+                        </select>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label">Calor Específico c [J/kg·K]</label>
+                            <input type="number" step="any" name="specific_heat" id="edit-c" class="form-control font-mono" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Condutividade k [W/m·K]</label>
+                            <input type="number" step="any" name="thermal_conductivity" id="edit-k" class="form-control font-mono" required>
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label">Dilatação α [K⁻¹]</label>
+                            <input type="number" step="any" name="thermal_expansion" id="edit-alpha" class="form-control font-mono" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Densidade ρ [kg/m³]</label>
+                            <input type="number" step="any" name="density" id="edit-density" class="form-control font-mono" required>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Temperatura Máxima [°C]</label>
+                        <input type="number" step="any" name="max_temp" id="edit-maxtemp" class="form-control font-mono">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Observações</label>
+                        <textarea name="notes" id="edit-notes" rows="2" class="form-control"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-thermo">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.querySelectorAll('.btn-edit-mat').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = btn.dataset.id;
+            const form = document.getElementById('editMaterialForm');
+            form.action = `/thermolab/materials/edit/${id}`;
+            document.getElementById('edit-name').value = btn.dataset.name;
+            document.getElementById('edit-category').value = btn.dataset.category;
+            document.getElementById('edit-c').value = btn.dataset.c;
+            document.getElementById('edit-alpha').value = btn.dataset.alpha;
+            document.getElementById('edit-k').value = btn.dataset.k;
+            document.getElementById('edit-density').value = btn.dataset.density;
+            document.getElementById('edit-maxtemp').value = btn.dataset.maxtemp;
+            document.getElementById('edit-notes').value = btn.dataset.notes;
+        });
+    });
+</script>
+{% endblock %}

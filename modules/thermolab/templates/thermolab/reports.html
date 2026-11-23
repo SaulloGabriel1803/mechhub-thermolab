@@ -1,0 +1,132 @@
+{% extends "thermolab/base_thermolab.html" %}
+{% block title %}Gráficos e Relatórios — ThermoLab{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end mb-4 gap-3">
+    <div>
+        <div class="font-mono text-warning small text-uppercase mb-1" style="letter-spacing: 0.08em;">
+            Funcionalidade 08 • Central de Exportação e Auditoria
+        </div>
+        <h1 class="page-title mb-1 text-white">Gráficos e Relatórios Técnicos</h1>
+        <p class="text-secondary mb-0 small">
+            Exporte relatórios profissionais em PDF (ReportLab + Matplotlib), planilhas CSV (Pandas) e consulte o histórico.
+        </p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a href="{{ url_for('thermolab.download_pdf_report') }}" class="btn btn-thermo">
+            <i class="bi bi-file-earmark-pdf-fill me-1"></i>Baixar Relatório PDF
+        </a>
+        <a href="{{ url_for('thermolab.download_materials_csv') }}" class="btn btn-outline-light border-secondary-subtle">
+            <i class="bi bi-filetype-csv text-info me-1"></i>Materiais CSV
+        </a>
+        <a href="{{ url_for('thermolab.download_calculations_csv') }}" class="btn btn-outline-light border-secondary-subtle">
+            <i class="bi bi-filetype-csv text-success me-1"></i>Histórico CSV
+        </a>
+        <form method="POST" action="{{ url_for('thermolab.clear_calculations') }}" onsubmit="return confirm('Deseja limpar todo o histórico de cálculos?');">
+            <button type="submit" class="btn btn-outline-danger">
+                <i class="bi bi-trash me-1"></i>Limpar Histórico
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Gráfico Consolidado -->
+<div class="tl-card mb-4">
+    <div class="tl-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <span><i class="bi bi-bar-chart-fill text-warning me-2"></i>Ranking Termofísico da Base ({{ materials|length }} materiais)</span>
+        <div class="btn-group btn-group-sm" role="group" aria-label="Selecionar Grandeza">
+            <button type="button" class="btn btn-warning text-dark fw-semibold rep-metric-switch active"
+                    data-index="0" data-label="Condutividade Térmica k [W/(m·K)]">k (W/m·K)</button>
+            <button type="button" class="btn btn-outline-secondary text-light rep-metric-switch"
+                    data-index="1" data-label="Coef. de Dilatação Linear α [×10⁻⁶ K⁻¹]">α (10⁻⁶/K)</button>
+            <button type="button" class="btn btn-outline-secondary text-light rep-metric-switch"
+                    data-index="2" data-label="Calor Específico c [J/(kg·K)]">c (J/kg·K)</button>
+        </div>
+    </div>
+    <div class="p-3">
+        <div id="reportsOverviewChart" class="plotly-container"></div>
+    </div>
+</div>
+
+<!-- Histórico Completo -->
+<div class="tl-card">
+    <div class="tl-card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-journal-text text-info me-2"></i>Memorial de Cálculos e Simulações (<span class="font-mono">{{ calculations|length }}</span>)</span>
+    </div>
+    <div class="p-3 table-responsive">
+        <table class="table table-dark-tl table-striped table-hover align-middle small mb-0">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Tipo</th>
+                    <th>Descrição</th>
+                    <th>Material Associado</th>
+                    <th>Resultados Chave</th>
+                    <th>Data / Hora</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in calculations %}
+                    <tr>
+                        <td class="font-mono text-secondary">#{{ c.id }}</td>
+                        <td><span class="font-mono badge bg-warning bg-opacity-10 text-warning border border-warning-subtle">{{ c.calc_type }}</span></td>
+                        <td class="fw-semibold text-white">{{ c.title }}</td>
+                        <td class="text-secondary">{{ c.material_name }}</td>
+                        <td class="font-mono text-info">
+                            {% if c.calc_type == 'calor_sensivel' %}
+                                Q = {{ "%.3f"|format(c.result_data.heat_kj|default(0)) }} kJ (ΔT={{ "%.1f"|format(c.result_data.delta_t_c|default(0)) }}°C)
+                            {% elif c.calc_type == 'dilatacao' %}
+                                Δ = {{ "%.4f"|format(c.result_data.delta_sub_measure|default(0)) }} {{ c.result_data.delta_sub_unit|default('') }}
+                            {% elif c.calc_type == 'conducao' %}
+                                Q̇ = {{ "%.2f"|format(c.result_data.heat_rate_w|default(0)) }} W
+                            {% elif c.calc_type == 'resistencia' %}
+                                R_eq = {{ "%.4f"|format(c.result_data.r_total_kw|default(0)) }} K/W | U = {{ "%.2f"|format(c.result_data.u_overall_w_m2k|default(0)) }} W/m²K
+                            {% elif c.calc_type == 'comparacao' %}
+                                Melhor condutor: {{ c.result_data.highlights.best_conductor.name|default('-') }}
+                            {% elif c.calc_type == 'simulacao' %}
+                                Bi = {{ "%.4f"|format(c.result_data.physical_indicators.biot_number|default(0)) }} | τ = {{ "%.1f"|format(c.result_data.physical_indicators.time_constant_s|default(0)) }} s
+                            {% endif %}
+                        </td>
+                        <td class="font-mono text-secondary">{{ c.created_at }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-secondary py-5">
+                            Nenhum cálculo registrado até o momento. Execute cálculos ou simulações para preencher o relatório.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const repSpec = {{ overview_chart_json | safe }};
+    const repChartEl = document.getElementById('reportsOverviewChart');
+    Plotly.newPlot(repChartEl, repSpec.data, repSpec.layout, {responsive: true, displayModeBar: false});
+
+    document.querySelectorAll('.rep-metric-switch').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const idx = Number(btn.dataset.index);
+            const label = btn.dataset.label;
+            document.querySelectorAll('.rep-metric-switch').forEach(b => {
+                b.classList.remove('btn-warning', 'text-dark', 'fw-semibold', 'active');
+                b.classList.add('btn-outline-secondary', 'text-light');
+            });
+            btn.classList.remove('btn-outline-secondary', 'text-light');
+            btn.classList.add('btn-warning', 'text-dark', 'fw-semibold', 'active');
+
+            const vals = repSpec.data[idx]?.x || [];
+            const maxVal = vals.length ? Math.max(...vals) : 100;
+            Plotly.restyle(repChartEl, {visible: [idx === 0, idx === 1, idx === 2]}, [0, 1, 2]);
+            Plotly.relayout(repChartEl, {
+                'xaxis.title.text': label,
+                'xaxis.range': [0, maxVal * 1.16]
+            });
+        });
+    });
+</script>
+{% endblock %}

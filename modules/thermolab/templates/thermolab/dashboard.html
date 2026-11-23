@@ -1,0 +1,264 @@
+{% extends "thermolab/base_thermolab.html" %}
+{% block title %}Painel Geral — ThermoLab | MechHub{% endblock %}
+
+{% block content %}
+<!-- Cabeçalho com Ações Imediatas -->
+<div class="d-flex flex-wrap justify-content-between align-items-end mb-4 gap-3">
+    <div>
+        <div class="font-mono text-warning small text-uppercase mb-1" style="letter-spacing: 0.08em;">
+            MechHub • Módulo 04 • Workbench de Engenharia Térmica
+        </div>
+        <h1 class="page-title mb-1 text-white">Painel de Controle Termofísico</h1>
+        <p class="text-secondary mb-0 small">
+            Acesse cálculos em 1 clique, inspecione propriedades de materiais e acompanhe simulações transientes.
+        </p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a href="{{ url_for('thermolab.materials') }}" class="btn btn-outline-light border-secondary-subtle">
+            <i class="bi bi-plus-lg me-1"></i>Novo Material
+        </a>
+        <a href="{{ url_for('thermolab.calculations') }}" class="btn btn-thermo">
+            <i class="bi bi-calculator me-1"></i>Iniciar Cálculo
+        </a>
+        <a href="{{ url_for('thermolab.simulation') }}" class="btn btn-outline-info">
+            <i class="bi bi-activity me-1"></i>Simular ΔT
+        </a>
+    </div>
+</div>
+
+<!-- KPIs com Hierarquia Visual Radical -->
+<div class="row g-3 mb-4">
+    <div class="col-xl-3 col-sm-6">
+        <div class="tl-kpi-card">
+            <div class="tl-kpi-label">Catálogo de Materiais</div>
+            <div class="my-2">
+                <span class="metric-hero">{{ total_materials }}</span>
+                <span class="metric-unit">ligas</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center small">
+                <span class="text-secondary">Base SQLite persistida</span>
+                <a href="{{ url_for('thermolab.materials') }}" class="text-warning text-decoration-none font-mono">Gerenciar →</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-sm-6">
+        <div class="tl-kpi-card">
+            <div class="tl-kpi-label">Análises Executadas</div>
+            <div class="my-2">
+                <span class="metric-hero">{{ total_calculations }}</span>
+                <span class="metric-unit">registros</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center small">
+                <span class="text-secondary">Memorial salvo em JSON</span>
+                <a href="{{ url_for('thermolab.reports') }}" class="text-info text-decoration-none font-mono">Relatório →</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-sm-6">
+        <div class="tl-kpi-card">
+            <div class="tl-kpi-label">Maior Condutor (k)</div>
+            <div class="my-2">
+                {% if best_conductor %}
+                    <span class="metric-hero text-warning">{{ "%.1f"|format(best_conductor.thermal_conductivity) }}</span>
+                    <span class="metric-unit">W/m·K</span>
+                {% else %}
+                    <span class="metric-hero">—</span>
+                {% endif %}
+            </div>
+            <div class="d-flex align-items-center gap-2 small text-light">
+                {% if best_conductor %}
+                    {% set vis_c = mat_visual(best_conductor.name, best_conductor.category) %}
+                    <span class="mat-swatch mat-swatch-sm" style="background: {{ vis_c.bg }};">{{ vis_c.code }}</span>
+                    <span class="text-truncate">{{ best_conductor.name }}</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-sm-6">
+        <div class="tl-kpi-card">
+            <div class="tl-kpi-label">Melhor Isolante (k)</div>
+            <div class="my-2">
+                {% if best_insulator %}
+                    <span class="metric-hero text-info">{{ "%.3f"|format(best_insulator.thermal_conductivity) }}</span>
+                    <span class="metric-unit">W/m·K</span>
+                {% else %}
+                    <span class="metric-hero">—</span>
+                {% endif %}
+            </div>
+            <div class="d-flex align-items-center gap-2 small text-light">
+                {% if best_insulator %}
+                    {% set vis_i = mat_visual(best_insulator.name, best_insulator.category) %}
+                    <span class="mat-swatch mat-swatch-sm" style="background: {{ vis_i.bg }};">{{ vis_i.code }}</span>
+                    <span class="text-truncate">{{ best_insulator.name }}</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Vitrine Rápida de Materiais com Ação Direta + Gráfico -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-5">
+        <div class="tl-card h-100">
+            <div class="tl-card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-palette2 text-warning me-2"></i>Acesso Direto por Material</span>
+                <a href="{{ url_for('thermolab.materials') }}" class="font-mono small text-secondary text-decoration-none">Ver todos →</a>
+            </div>
+            <div class="p-3 d-flex flex-column gap-2" style="max-height: 410px; overflow-y: auto;">
+                {% for m in materials_showcase %}
+                    {% set vis = mat_visual(m.name, m.category) %}
+                    {% set k_pct = ((m.thermal_conductivity / max_k) * 100) if max_k > 0 else 0 %}
+                    <div class="p-2 rounded-3 border border-secondary-subtle bg-dark bg-opacity-25 d-flex align-items-center justify-content-between gap-2">
+                        <div class="d-flex align-items-center gap-2 min-w-0 flex-grow-1">
+                            <span class="mat-swatch" style="background: {{ vis.bg }};">{{ vis.code }}</span>
+                            <div class="min-w-0 flex-grow-1">
+                                <div class="fw-semibold text-white small text-truncate">{{ m.name }}</div>
+                                <div class="d-flex align-items-center gap-2 font-mono text-secondary" style="font-size: 0.72rem;">
+                                    <span>k={{ "%.2f"|format(m.thermal_conductivity) }}</span>
+                                    <span>•</span>
+                                    <span>α={{ "%.1f"|format(m.thermal_expansion * 1e6) }}e-6</span>
+                                </div>
+                                <div class="progress-micro" style="max-width: 140px;">
+                                    <div class="progress-micro-bar bg-warning" style="width: {{ [k_pct, 4]|max }}%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-1 flex-shrink-0">
+                            <a href="{{ url_for('thermolab.calculations', material_id=m.id) }}"
+                               class="btn btn-sm btn-outline-light border-secondary-subtle py-1 px-2" style="font-size: 0.74rem;"
+                               title="Calcular com este material">
+                                Calcular
+                            </a>
+                            <a href="{{ url_for('thermolab.simulation', material_id=m.id) }}"
+                               class="btn btn-sm btn-outline-info py-1 px-2" style="font-size: 0.74rem;"
+                               title="Simular variação de temperatura">
+                                Simular
+                            </a>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="tl-card h-100">
+            <div class="tl-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <span><i class="bi bi-bar-chart-line text-warning me-2"></i>Ranking Termofísico</span>
+                <div class="btn-group btn-group-sm" role="group" aria-label="Selecionar Grandeza">
+                    <button type="button" class="btn btn-warning text-dark fw-semibold metric-switch active"
+                            data-index="0" data-label="Condutividade Térmica k [W/(m·K)]">k (W/m·K)</button>
+                    <button type="button" class="btn btn-outline-secondary text-light metric-switch"
+                            data-index="1" data-label="Coef. de Dilatação Linear α [×10⁻⁶ K⁻¹]">α (10⁻⁶/K)</button>
+                    <button type="button" class="btn btn-outline-secondary text-light metric-switch"
+                            data-index="2" data-label="Calor Específico c [J/(kg·K)]">c (J/kg·K)</button>
+                </div>
+            </div>
+            <div class="p-3">
+                <div id="overviewChart" class="plotly-container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Grade de Funcionalidades (Fluxos de Trabalho) + Timeline -->
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="tl-card h-100">
+            <div class="tl-card-header">
+                <i class="bi bi-lightning-charge text-warning me-2"></i>Fluxos de Engenharia (8 Funcionalidades)
+            </div>
+            <div class="p-3">
+                <div class="row g-2">
+                    {% set modules_cards = [
+                        ('01', 'Cadastrar Materiais', 'CRUD de c, α, k, ρ e T_máx', url_for('thermolab.materials')),
+                        ('02', 'Calor Sensível', 'Q = m·c·ΔT e potência térmica', url_for('thermolab.calculations', tab='calor_sensivel')),
+                        ('03', 'Dilatação Térmica', 'Linear 1D, 2D e Volumétrica 3D', url_for('thermolab.calculations', tab='dilatacao')),
+                        ('04', 'Condução (Fourier)', 'Parede plana e tubulações', url_for('thermolab.calculations', tab='conducao')),
+                        ('05', 'Resistência Térmica', 'Parede composta + convecção', url_for('thermolab.calculations', tab='resistencia')),
+                        ('06', 'Comparar Materiais', 'Ranking com Pandas DataFrame', url_for('thermolab.comparison')),
+                        ('07', 'Simular ΔT (Biot)', 'Paramétrica + Transiente Newton', url_for('thermolab.simulation')),
+                        ('08', 'Relatórios e Gráficos', 'PDF ReportLab + CSV + Plotly', url_for('thermolab.reports')),
+                    ] %}
+                    {% for num, title, desc, link in modules_cards %}
+                        <div class="col-sm-6">
+                            <a href="{{ link }}" class="text-decoration-none">
+                                <div class="p-2.5 px-3 py-2 rounded-3 border border-secondary-subtle bg-dark bg-opacity-25 tl-card-interactive d-flex align-items-center justify-content-between">
+                                    <div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="font-mono text-warning fw-bold" style="font-size: 0.74rem;">{{ num }}</span>
+                                            <span class="fw-semibold text-white small">{{ title }}</span>
+                                        </div>
+                                        <div class="text-secondary" style="font-size: 0.76rem;">{{ desc }}</div>
+                                    </div>
+                                    <i class="bi bi-arrow-right-short text-secondary fs-5"></i>
+                                </div>
+                            </a>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="tl-card h-100">
+            <div class="tl-card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-clock-history text-info me-2"></i>Atividade Recente</span>
+                <a href="{{ url_for('thermolab.reports') }}" class="font-mono small text-secondary text-decoration-none">Histórico →</a>
+            </div>
+            <div class="p-3">
+                {% if recent_calcs %}
+                    <div class="d-flex flex-column gap-2">
+                        {% for item in recent_calcs[:5] %}
+                            <div class="p-2 rounded-3 border border-secondary-subtle bg-dark bg-opacity-25">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="font-mono badge bg-warning bg-opacity-10 text-warning border border-warning-subtle">{{ item.calc_type }}</span>
+                                    <span class="font-mono text-secondary" style="font-size: 0.72rem;">{{ item.created_at }}</span>
+                                </div>
+                                <div class="fw-semibold text-white small mt-1">{{ item.title }}</div>
+                                <div class="text-secondary" style="font-size: 0.75rem;">{{ item.material_name }}</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center text-secondary py-4">
+                        <i class="bi bi-terminal fs-2 d-block mb-2 text-muted"></i>
+                        <div class="small mb-3">Nenhuma análise registrada ainda.</div>
+                        <a href="{{ url_for('thermolab.calculations') }}" class="btn btn-sm btn-thermo">Executar Primeiro Cálculo</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const overviewSpec = {{ overview_chart_json | safe }};
+    const chartEl = document.getElementById('overviewChart');
+    Plotly.newPlot(chartEl, overviewSpec.data, overviewSpec.layout, {responsive: true, displayModeBar: false});
+
+    document.querySelectorAll('.metric-switch').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const idx = Number(btn.dataset.index);
+            const label = btn.dataset.label;
+            document.querySelectorAll('.metric-switch').forEach(b => {
+                b.classList.remove('btn-warning', 'text-dark', 'fw-semibold', 'active');
+                b.classList.add('btn-outline-secondary', 'text-light');
+            });
+            btn.classList.remove('btn-outline-secondary', 'text-light');
+            btn.classList.add('btn-warning', 'text-dark', 'fw-semibold', 'active');
+
+            const vals = overviewSpec.data[idx]?.x || [];
+            const maxVal = vals.length ? Math.max(...vals) : 100;
+            Plotly.restyle(chartEl, {visible: [idx === 0, idx === 1, idx === 2]}, [0, 1, 2]);
+            Plotly.relayout(chartEl, {
+                'xaxis.title.text': label,
+                'xaxis.range': [0, maxVal * 1.16]
+            });
+        });
+    });
+</script>
+{% endblock %}

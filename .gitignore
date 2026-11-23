@@ -1,0 +1,27 @@
+# Python / Caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Ambientes virtuais e segredos
+.venv/
+venv/
+env/
+.env
+.env.*
+
+# Banco de dados local e logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# IDE / Sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,728 @@
+{% extends "thermolab/base_thermolab.html" %}
+{% block title %}Cálculos Térmicos — ThermoLab{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end mb-4 gap-3">
+    <div>
+        <div class="font-mono text-warning small text-uppercase mb-1" style="letter-spacing: 0.08em;">
+            Funcionalidades 02 a 05 • Solver Termofísico
+        </div>
+        <h1 class="page-title mb-1 text-white">Motor de Cálculos Térmicos</h1>
+        <p class="text-secondary mb-0 small">
+            Use um cenário pronto (preset), selecione qualquer material cadastrado ou informe parâmetros manuais.
+        </p>
+    </div>
+</div>
+
+<!-- Abas de Cálculos -->
+<ul class="nav nav-pills mb-4" id="calcTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == 'calor_sensivel' %}active{% endif %}"
+                data-bs-toggle="pill" data-bs-target="#tab-calor" type="button">
+            <span class="font-mono me-1">02</span> Calor Sensível
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == 'dilatacao' %}active{% endif %}"
+                data-bs-toggle="pill" data-bs-target="#tab-dilatacao" type="button">
+            <span class="font-mono me-1">03</span> Dilatação Térmica
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == 'conducao' %}active{% endif %}"
+                data-bs-toggle="pill" data-bs-target="#tab-conducao" type="button">
+            <span class="font-mono me-1">04</span> Condução (Fourier)
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == 'resistencia' %}active{% endif %}"
+                data-bs-toggle="pill" data-bs-target="#tab-resistencia" type="button">
+            <span class="font-mono me-1">05</span> Resistência Térmica
+        </button>
+    </li>
+</ul>
+
+<div class="row g-4">
+    <!-- Formulários -->
+    <div class="col-lg-5">
+        <div class="tl-card p-3">
+            <div class="tab-content">
+                <!-- ABA 2: CALOR SENSÍVEL -->
+                <div class="tab-pane fade {% if active_tab == 'calor_sensivel' %}show active{% endif %}" id="tab-calor">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="fw-bold text-white mb-0">Calor Sensível &amp; Potência</h5>
+                        <span class="font-mono small text-warning">Q = m·c·ΔT</span>
+                    </div>
+                    <div class="preset-bar mb-3">
+                        <span class="font-mono text-secondary" style="font-size: 0.72rem;">PRESETS:</span>
+                        <button type="button" class="preset-chip" onclick="applyCalorPreset(25, 896, 25, 180, 90)">
+                            <i class="bi bi-lightning-charge text-warning"></i> Bloco Alumínio
+                        </button>
+                        <button type="button" class="preset-chip" onclick="applyCalorPreset(50, 486, 850, 40, 300)">
+                            <i class="bi bi-snow text-info"></i> Têmpera Aço
+                        </button>
+                    </div>
+                    <form id="form-calor" method="POST" action="{{ url_for('thermolab.calculations') }}">
+                        <input type="hidden" name="calc_type" value="calor_sensivel">
+                        <div class="mb-3">
+                            <label class="form-label">Material do Catálogo (preenchimento automático)</label>
+                            <select name="material_id" id="calor-mat-select" class="form-select mat-autofill" data-target="calor">
+                                <option value="">— Entrada manual —</option>
+                                {% for m in materials %}
+                                    <option value="{{ m.id }}" {% if selected_material_id == m.id %}selected{% endif %}>
+                                        {{ m.name }} (c={{ m.specific_heat }} J/kg·K)
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Massa m [kg] *</label>
+                                <input type="number" step="any" min="0.0001" name="mass" id="calor-mass" value="15.0" class="form-control font-mono" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Calor Espec. c [J/kg·K] *</label>
+                                <input type="number" step="any" min="0.0001" name="specific_heat" id="calor-c" value="486" class="form-control font-mono" required>
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Temp. Inicial T_i [°C] *</label>
+                                <input type="number" step="any" name="temp_initial" id="calor-ti" value="25" class="form-control font-mono" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Temp. Final T_f [°C] *</label>
+                                <input type="number" step="any" name="temp_final" id="calor-tf" value="220" class="form-control font-mono" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Duração do Processo Δt [s] (opcional)</label>
+                            <input type="number" step="any" min="0.001" name="time_seconds" id="calor-time" value="120" class="form-control font-mono" placeholder="Ex: 120">
+                        </div>
+                        <button type="submit" class="btn btn-thermo w-100">
+                            <i class="bi bi-play-fill me-1"></i>Calcular Calor Sensível
+                        </button>
+                    </form>
+                </div>
+
+                <!-- ABA 3: DILATAÇÃO TÉRMICA -->
+                <div class="tab-pane fade {% if active_tab == 'dilatacao' %}show active{% endif %}" id="tab-dilatacao">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="fw-bold text-white mb-0">Dilatação Térmica</h5>
+                        <span class="font-mono small text-warning">ΔX = X₀·α_ef·ΔT</span>
+                    </div>
+                    <div class="preset-bar mb-3">
+                        <span class="font-mono text-secondary" style="font-size: 0.72rem;">PRESETS:</span>
+                        <button type="button" class="preset-chip" onclick="applyDilatacaoPreset('linear', 12.0, 11.7e-6, 15, 65, 1420)">
+                            <i class="bi bi-rulers text-warning"></i> Trilho de Aço 12m
+                        </button>
+                        <button type="button" class="preset-chip" onclick="applyDilatacaoPreset('volumetrica', 0.08, 23.1e-6, 20, 350, 582)">
+                            <i class="bi bi-box text-info"></i> Pistão Alumínio 3D
+                        </button>
+                    </div>
+                    <form id="form-dilatacao" method="POST" action="{{ url_for('thermolab.calculations') }}">
+                        <input type="hidden" name="calc_type" value="dilatacao">
+                        <div class="mb-3">
+                            <label class="form-label">Material do Catálogo</label>
+                            <select name="material_id" id="dilatacao-mat-select" class="form-select mat-autofill" data-target="dilatacao">
+                                <option value="">— Entrada manual —</option>
+                                {% for m in materials %}
+                                    <option value="{{ m.id }}" {% if selected_material_id == m.id %}selected{% endif %}>
+                                        {{ m.name }} (α={{ "%.2f"|format(m.thermal_expansion * 1e6) }}×10⁻⁶ K⁻¹)
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Regime *</label>
+                                <select name="mode" id="dilatacao-mode" class="form-select">
+                                    <option value="linear" {% if calc_result and calc_result.mode == 'linear' %}selected{% endif %}>Linear (1D - α)</option>
+                                    <option value="superficial" {% if calc_result and calc_result.mode == 'superficial' %}selected{% endif %}>Superficial (2D - 2α)</option>
+                                    <option value="volumetrica" {% if calc_result and calc_result.mode == 'volumetrica' %}selected{% endif %}>Volumétrica (3D - 3α)</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Medida X₀ [m/m²/m³] *</label>
+                                <input type="number" step="any" min="0.00001" name="initial_measure" id="dilatacao-x0"
+                                       value="{{ calc_result.initial_measure if calc_result and active_tab == 'dilatacao' else '2.5' }}"
+                                       class="form-control font-mono" required>
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Coef. Linear α [K⁻¹] *</label>
+                                <input type="number" step="any" min="1e-10" name="alpha" id="dilatacao-alpha"
+                                       value="{{ calc_result.alpha_linear if calc_result and active_tab == 'dilatacao' else '0.0000117' }}"
+                                       class="form-control font-mono" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Limite T_máx [°C]</label>
+                                <input type="number" step="any" name="max_temp" id="dilatacao-maxtemp"
+                                       value="{{ calc_result.max_temp_c if calc_result and active_tab == 'dilatacao' and calc_result.max_temp_c is not none else '1420' }}"
+                                       class="form-control font-mono">
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Temp. Inicial T_i [°C] *</label>
+                                <input type="number" step="any" name="temp_initial" id="dilatacao-ti"
+                                       value="{{ calc_result.temp_initial_c if calc_result and active_tab == 'dilatacao' else '20' }}"
+                                       class="form-control font-mono" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Temp. Final T_f [°C] *</label>
+                                <input type="number" step="any" name="temp_final" id="dilatacao-tf"
+                                       value="{{ calc_result.temp_final_c if calc_result and active_tab == 'dilatacao' else '180' }}"
+                                       class="form-control font-mono" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-thermo w-100">
+                            <i class="bi bi-play-fill me-1"></i>Calcular Dilatação Térmica
+                        </button>
+                    </form>
+                </div>
+
+                <!-- ABA 4: CONDUÇÃO TÉRMICA -->
+                <div class="tab-pane fade {% if active_tab == 'conducao' %}show active{% endif %}" id="tab-conducao">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="fw-bold text-white mb-0">Condução Térmica</h5>
+                        <span class="font-mono small text-warning">Lei de Fourier</span>
+                    </div>
+                    <div class="preset-bar mb-3">
+                        <span class="font-mono text-secondary" style="font-size: 0.72rem;">PRESETS:</span>
+                        <button type="button" class="preset-chip" onclick="applyConducaoFlat(167.0, 0.25, 0.015, 110, 35)">
+                            <i class="bi bi-cpu text-warning"></i> Dissipador Al
+                        </button>
+                        <button type="button" class="preset-chip" onclick="applyConducaoCyl(51.9, 0.05, 0.065, 12.0, 280, 60)">
+                            <i class="bi bi-circle text-info"></i> Tubo Vapor Aço
+                        </button>
+                    </div>
+                    <form id="form-conducao" method="POST" action="{{ url_for('thermolab.calculations') }}">
+                        <input type="hidden" name="calc_type" value="conducao">
+                        <div class="mb-3">
+                            <label class="form-label">Material do Catálogo</label>
+                            <select name="material_id" id="conducao-mat-select" class="form-select mat-autofill" data-target="conducao">
+                                <option value="">— Entrada manual —</option>
+                                {% for m in materials %}
+                                    <option value="{{ m.id }}" {% if selected_material_id == m.id %}selected{% endif %}>
+                                        {{ m.name }} (k={{ m.thermal_conductivity }} W/m·K)
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Geometria *</label>
+                                <select name="geometry" id="conducao-geom" class="form-select">
+                                    <option value="flat">Parede Plana</option>
+                                    <option value="cylindrical">Cilindro / Tubulação</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Condutividade k [W/m·K] *</label>
+                                <input type="number" step="any" min="0.0001" name="thermal_conductivity" id="conducao-k" value="51.9" class="form-control font-mono" required>
+                            </div>
+                        </div>
+                        <div id="geom-flat-fields" class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Área A [m²] *</label>
+                                <input type="number" step="any" min="0.0001" name="area" id="conducao-area" value="2.0" class="form-control font-mono">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Espessura L [m] *</label>
+                                <input type="number" step="any" min="0.0001" name="thickness" id="conducao-thick" value="0.05" class="form-control font-mono">
+                            </div>
+                        </div>
+                        <div id="geom-cyl-fields" class="row g-2 mb-3 d-none">
+                            <div class="col-4">
+                                <label class="form-label">Raio r₁ [m] *</label>
+                                <input type="number" step="any" min="0.0001" name="r_inner" id="conducao-r1" value="0.05" class="form-control font-mono">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label">Raio r₂ [m] *</label>
+                                <input type="number" step="any" min="0.0002" name="r_outer" id="conducao-r2" value="0.08" class="form-control font-mono">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label">Comp. L [m] *</label>
+                                <input type="number" step="any" min="0.001" name="length" id="conducao-len" value="3.0" class="form-control font-mono">
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Temp. Quente T₁ [°C] *</label>
+                                <input type="number" step="any" name="temp_hot" id="conducao-t1" value="350" class="form-control font-mono" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Temp. Fria T₂ [°C] *</label>
+                                <input type="number" step="any" name="temp_cold" id="conducao-t2" value="45" class="form-control font-mono" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-thermo w-100">
+                            <i class="bi bi-play-fill me-1"></i>Calcular Condução Térmica
+                        </button>
+                    </form>
+                </div>
+
+                <!-- ABA 5: RESISTÊNCIA TÉRMICA MULTICAMADAS -->
+                <div class="tab-pane fade {% if active_tab == 'resistencia' %}show active{% endif %}" id="tab-resistencia">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="fw-bold text-white mb-0">Resistência Multicamadas</h5>
+                        <span class="font-mono small text-warning">R_eq = Σ R_i</span>
+                    </div>
+                    <div class="tl-formula-box mb-3">R_eq = Σ(L_i / k_i·A) + 1/(h_i·A) + 1/(h_e·A)</div>
+                    <form method="POST" action="{{ url_for('thermolab.calculations') }}">
+                        <input type="hidden" name="calc_type" value="resistencia">
+                        <div class="row g-2 mb-2">
+                            <div class="col-4">
+                                <label class="form-label">Área A [m²] *</label>
+                                <input type="number" step="any" min="0.0001" name="area" value="4.0" class="form-control font-mono" required>
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label">T_interna [°C] *</label>
+                                <input type="number" step="any" name="temp_inner" value="650" class="form-control font-mono" required>
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label">T_externa [°C] *</label>
+                                <input type="number" step="any" name="temp_outer" value="25" class="form-control font-mono" required>
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Convecção h_i [W/m²K]</label>
+                                <input type="number" step="any" min="0.01" name="h_inner" value="80" class="form-control font-mono" placeholder="Opcional">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Convecção h_e [W/m²K]</label>
+                                <input type="number" step="any" min="0.01" name="h_outer" value="20" class="form-control font-mono" placeholder="Opcional">
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="small fw-semibold text-info">Camadas em Série (Interna → Externa)</span>
+                            <button type="button" class="btn btn-sm btn-outline-info py-0 px-2" id="btn-add-layer">
+                                <i class="bi bi-plus-lg"></i> Camada
+                            </button>
+                        </div>
+
+                        <div id="layers-container" class="d-flex flex-column gap-2 mb-3">
+                            <div class="layer-row p-2 rounded-3 border border-secondary-subtle bg-dark bg-opacity-25">
+                                <div class="row g-2 align-items-center">
+                                    <div class="col-5">
+                                        <input type="text" name="layer_name[]" value="Aço Inox AISI 304" class="form-control form-control-sm" placeholder="Nome" required>
+                                    </div>
+                                    <div class="col-3">
+                                        <input type="number" step="any" min="0.0001" name="layer_thickness[]" value="0.015" class="form-control form-control-sm font-mono" placeholder="L (m)" required>
+                                    </div>
+                                    <div class="col-3">
+                                        <input type="number" step="any" min="0.0001" name="layer_k[]" value="16.2" class="form-control form-control-sm font-mono" placeholder="k" required>
+                                    </div>
+                                    <div class="col-1 text-end">
+                                        <button type="button" class="btn btn-sm btn-outline-danger btn-remove-layer py-0 px-1">×</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="layer-row p-2 rounded-3 border border-secondary-subtle bg-dark bg-opacity-25">
+                                <div class="row g-2 align-items-center">
+                                    <div class="col-5">
+                                        <input type="text" name="layer_name[]" value="Lã de Rocha (Isolante)" class="form-control form-control-sm" placeholder="Nome" required>
+                                    </div>
+                                    <div class="col-3">
+                                        <input type="number" step="any" min="0.0001" name="layer_thickness[]" value="0.10" class="form-control form-control-sm font-mono" placeholder="L (m)" required>
+                                    </div>
+                                    <div class="col-3">
+                                        <input type="number" step="any" min="0.0001" name="layer_k[]" value="0.04" class="form-control form-control-sm font-mono" placeholder="k" required>
+                                    </div>
+                                    <div class="col-1 text-end">
+                                        <button type="button" class="btn btn-sm btn-outline-danger btn-remove-layer py-0 px-1">×</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-thermo w-100">
+                            <i class="bi bi-play-fill me-1"></i>Calcular Resistência Equivalente
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Card de Inspeção Instantânea do Material Selecionado -->
+            <div id="material-inspector" class="material-inspector mt-3 d-none">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="font-mono text-warning small fw-bold" id="insp-name">—</span>
+                    <span class="badge bg-secondary bg-opacity-25 text-secondary" id="insp-cat">—</span>
+                </div>
+                <div class="row g-2 font-mono small text-secondary" style="font-size: 0.74rem;">
+                    <div class="col-6">c: <span class="text-white" id="insp-c">—</span> J/kg·K</div>
+                    <div class="col-6">k: <span class="text-white" id="insp-k">—</span> W/m·K</div>
+                    <div class="col-6">α: <span class="text-white" id="insp-a">—</span> ×10⁻⁶/K</div>
+                    <div class="col-6">T_máx: <span class="text-white" id="insp-tmax">—</span> °C</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Painel de Resultados e Gráfico -->
+    <div class="col-lg-7">
+        {% if calc_result %}
+            <div class="tl-card mb-4">
+                <div class="tl-card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-check2-circle text-success me-2"></i>Resultado da Análise Térmica</span>
+                    <span class="font-mono badge bg-warning text-dark">{{ active_tab|upper }}</span>
+                </div>
+                <div class="p-3">
+                    {% if active_tab == 'calor_sensivel' %}
+                        <div class="row g-3 mb-3">
+                            <div class="col-sm-4">
+                                <div class="tl-kpi-card">
+                                    <div class="tl-kpi-label">Calor Sensível (Q)</div>
+                                    <div class="my-1">
+                                        <span class="metric-hero text-warning">{{ "%.2f"|format(calc_result.heat_kj) }}</span>
+                                        <span class="metric-unit">kJ</span>
+                                    </div>
+                                    <small class="font-mono text-secondary">{{ "%.0f"|format(calc_result.heat_j) }} J • {{ "%.1f"|format(calc_result.heat_kcal) }} kcal</small>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="tl-kpi-card">
+                                    <div class="tl-kpi-label">Variação ΔT</div>
+                                    <div class="my-1">
+                                        <span class="metric-hero text-info">{{ "%.1f"|format(calc_result.delta_t_c) }}</span>
+                                        <span class="metric-unit">°C</span>
+                                    </div>
+                                    <small class="text-secondary">{{ calc_result.process_type }}</small>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="tl-kpi-card">
+                                    <div class="tl-kpi-label">Potência Média (Q̇)</div>
+                                    <div class="my-1">
+                                        {% if calc_result.power_watts is not none %}
+                                            <span class="metric-hero text-success">{{ "%.2f"|format(calc_result.power_kw) }}</span>
+                                            <span class="metric-unit">kW</span>
+                                        {% else %}
+                                            <span class="metric-hero text-muted">—</span>
+                                        {% endif %}
+                                    </div>
+                                    <small class="font-mono text-secondary">
+                                        {% if calc_result.power_watts is not none %}
+                                            {{ "%.0f"|format(calc_result.power_watts) }} W • {{ "%.4f"|format(calc_result.heat_kwh) }} kWh
+                                        {% else %}
+                                            Δt não informado
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                    {% elif active_tab == 'dilatacao' %}
+                        {% if calc_result.exceeds_max_temp %}
+                            <div class="context-alert mb-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi bi-exclamation-triangle-fill text-danger fs-4"></i>
+                                    <div>
+                                        <div class="fw-bold text-white small">Temperatura excede o limite do material ({{ calc_result.max_temp_c }} °C)</div>
+                                        <div class="text-secondary" style="font-size: 0.78rem;">Risco de perda estrutural ou fusão na faixa informada.</div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-danger fw-semibold"
+                                        onclick="limitSafeTemp({{ (calc_result.max_temp_c * 0.9)|round(1) }})">
+                                    <i class="bi bi-shield-check me-1"></i>Ajustar para {{ (calc_result.max_temp_c * 0.9)|round(0)|int }} °C e Recalcular
+                                </button>
+                            </div>
+                        {% endif %}
+                        <div class="row g-3 mb-3">
+                            <div class="col-sm-4">
+                                <div class="tl-kpi-card">
+                                    <div class="tl-kpi-label">Variação Dimensional</div>
+                                    <div class="my-1">
+                                        <span class="metric-hero text-warning">{{ "%.4f"|format(calc_result.delta_sub_measure) }}</span>
+                                        <span class="metric-unit">{{ calc_result.delta_sub_unit }}</span>
+                                    </div>
+                                    <small class="font-mono text-secondary">{{ "%.6f"|format(calc_result.delta_measure) }} {{ calc_result.unit }}</small>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="tl-kpi-card">
+                                    <div class="tl-kpi-label">Medida Final (X_f)</div>
+                                    <div class="my-1">
+                                        <span class="metric-hero text-info">{{ "%.5f"|format(calc_result.final_measure) }}</span>
+                                        <span class="metric-unit">{{ calc_result.unit }}</span>
+                                    </div>
+                                    <small class="font-mono text-secondary">X₀ = {{ calc_result.initial_measure }} {{ calc_result.unit }}</small>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="tl-kpi-card">
+                                    <div class="tl-kpi-label">Deformação (ε_T)</div>
+                                    <div class="my-1">
+                                        <span class="metric-hero text-success">{{ "%.4f"|format(calc_result.strain_percent) }}</span>
+                                        <span class="metric-unit">%</span>
+                                    </div>
+                                    <small class="font-mono text-secondary">{{ "%.3f"|format(calc_result.mm_per_m) }} mm/m</small>
+                                </div>
+                            </div>
+                        </div>
+
+                    {% elif active_tab == 'conducao' %}
+                        <div class="row g-3 mb-3">
+                            <div class="col-sm-4">
+                                <div class="tl-kpi-card">
+                                    <div class="tl-kpi-label">Taxa de Calor (Q̇)</div>
+                                    <div class="my-1">
+                                        <span class="metric-hero text-warning">{{ "%.1f"|format(calc_result.heat_rate_w) }}</span>
+                                        <span class="metric-unit">W</span>
+                                    </div>
+                                    <small class="font-mono text-secondary">{{ "%.3f"|format(calc_result.heat_rate_kw) }} kW</small>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="tl-kpi-card">
+                                    <div class="tl-kpi-label">Fluxo de Calor (q'')</div>
+                                    <div class="my-1">
+                                        <span class="metric-hero text-info">{{ "%.0f"|format(calc_result.heat_flux_w_m2) }}</span>
+                                        <span class="metric-unit">W/m²</span>
+                                    </div>
+                                    <small class="font-mono text-secondary">dT/dx = {{ "%.1f"|format(calc_result.temp_gradient_c_m) }} °C/m</small>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="tl-kpi-card">
+                                    <div class="tl-kpi-label">Resistência R_cond</div>
+                                    <div class="my-1">
+                                        <span class="metric-hero text-success">{{ "%.5f"|format(calc_result.thermal_resistance_kw) }}</span>
+                                        <span class="metric-unit">K/W</span>
+                                    </div>
+                                    <small class="text-secondary">{{ calc_result.geometry_label }}</small>
+                                </div>
+                            </div>
+                        </div>
+
+                    {% elif active_tab == 'resistencia' %}
+                        <div class="row g-3 mb-3">
+                            <div class="col-sm-4">
+                                <div class="tl-kpi-card">
+                                    <div class="tl-kpi-label">Resistência R_eq</div>
+                                    <div class="my-1">
+                                        <span class="metric-hero text-warning">{{ "%.4f"|format(calc_result.r_total_kw) }}</span>
+                                        <span class="metric-unit">K/W</span>
+                                    </div>
+                                    <small class="font-mono text-secondary">L_total = {{ "%.3f"|format(calc_result.total_thickness_m) }} m</small>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="tl-kpi-card">
+                                    <div class="tl-kpi-label">Taxa de Calor (Q̇)</div>
+                                    <div class="my-1">
+                                        <span class="metric-hero text-info">{{ "%.1f"|format(calc_result.heat_rate_w) }}</span>
+                                        <span class="metric-unit">W</span>
+                                    </div>
+                                    <small class="font-mono text-secondary">q'' = {{ "%.1f"|format(calc_result.heat_flux_w_m2) }} W/m²</small>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="tl-kpi-card">
+                                    <div class="tl-kpi-label">Coef. Global (U)</div>
+                                    <div class="my-1">
+                                        <span class="metric-hero text-success">{{ "%.3f"|format(calc_result.u_overall_w_m2k) }}</span>
+                                        <span class="metric-unit">W/m²K</span>
+                                    </div>
+                                    <small class="font-mono text-secondary">A = {{ calc_result.area_m2 }} m²</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-responsive mb-3">
+                            <table class="table table-dark-tl table-sm table-striped small mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Elemento</th>
+                                        <th>Tipo</th>
+                                        <th class="text-end">R [K/W]</th>
+                                        <th class="text-end">T_in [°C]</th>
+                                        <th class="text-end">T_out [°C]</th>
+                                        <th class="text-end">% Isolamento</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in calc_result.resistances %}
+                                        <tr>
+                                            <td class="fw-semibold">{{ item.name }}</td>
+                                            <td class="text-secondary">{{ item.type }}</td>
+                                            <td class="text-end font-mono">{{ "%.5f"|format(item.resistance_kw) }}</td>
+                                            <td class="text-end font-mono">{{ "%.1f"|format(item.temp_start_c) }}</td>
+                                            <td class="text-end font-mono">{{ "%.1f"|format(item.temp_end_c) }}</td>
+                                            <td class="text-end font-mono text-warning fw-semibold">{{ "%.1f"|format(item.share_percent) }}%</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endif %}
+
+                    <div id="calcChart" class="plotly-container"></div>
+                </div>
+            </div>
+        {% else %}
+            <div class="tl-card p-5 text-center text-secondary">
+                <i class="bi bi-sliders2-vertical fs-1 text-warning mb-3 d-block"></i>
+                <h5 class="text-white fw-bold">Solver Pronto para Execução</h5>
+                <p class="small mb-3">
+                    Selecione um preset rápido ao lado ou escolha um material do catálogo para calcular e visualizar o gráfico interativo imediatamente.
+                </p>
+                <button type="button" class="btn btn-sm btn-outline-warning" onclick="applyCalorPreset(25, 896, 25, 180, 90); document.getElementById('form-calor').submit();">
+                    <i class="bi bi-lightning-charge me-1"></i>Rodar Exemplo de Demonstração Agora
+                </button>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const materialsDB = {{ materials_json | tojson }};
+    const matMap = {};
+    materialsDB.forEach(m => { matMap[String(m.id)] = m; });
+
+    function updateInspector(m) {
+        const box = document.getElementById('material-inspector');
+        if (!m || !box) {
+            if (box) box.classList.add('d-none');
+            return;
+        }
+        box.classList.remove('d-none');
+        document.getElementById('insp-name').textContent = m.name;
+        document.getElementById('insp-cat').textContent = m.category;
+        document.getElementById('insp-c').textContent = m.specific_heat;
+        document.getElementById('insp-k').textContent = m.thermal_conductivity;
+        document.getElementById('insp-a').textContent = (m.thermal_expansion * 1e6).toFixed(2);
+        document.getElementById('insp-tmax').textContent = m.max_temp ?? '—';
+    }
+
+    function applyMaterialToTarget(m, target) {
+        if (!m) return;
+        updateInspector(m);
+        if (target === 'calor') {
+            document.getElementById('calor-c').value = m.specific_heat;
+        } else if (target === 'dilatacao') {
+            document.getElementById('dilatacao-alpha').value = m.thermal_expansion;
+            document.getElementById('dilatacao-maxtemp').value = m.max_temp ?? '';
+        } else if (target === 'conducao') {
+            document.getElementById('conducao-k').value = m.thermal_conductivity;
+        }
+    }
+
+    document.querySelectorAll('.mat-autofill').forEach(select => {
+        select.addEventListener('change', () => {
+            const m = matMap[select.value];
+            applyMaterialToTarget(m, select.dataset.target);
+        });
+    });
+
+    // Pré-preenche caso venha ?material_id=... da página de Materiais
+    const preselectedId = "{{ selected_material_id or '' }}";
+    if (preselectedId && matMap[preselectedId]) {
+        const m = matMap[preselectedId];
+        applyMaterialToTarget(m, 'calor');
+        applyMaterialToTarget(m, 'dilatacao');
+        applyMaterialToTarget(m, 'conducao');
+    }
+
+    // Presets Rápidos
+    function applyCalorPreset(mass, c, ti, tf, timeSec) {
+        document.getElementById('calor-mass').value = mass;
+        document.getElementById('calor-c').value = c;
+        document.getElementById('calor-ti').value = ti;
+        document.getElementById('calor-tf').value = tf;
+        document.getElementById('calor-time').value = timeSec;
+    }
+
+    function applyDilatacaoPreset(mode, x0, alpha, ti, tf, tmax) {
+        document.getElementById('dilatacao-mode').value = mode;
+        document.getElementById('dilatacao-x0').value = x0;
+        document.getElementById('dilatacao-alpha').value = alpha;
+        document.getElementById('dilatacao-ti').value = ti;
+        document.getElementById('dilatacao-tf').value = tf;
+        document.getElementById('dilatacao-maxtemp').value = tmax;
+    }
+
+    function limitSafeTemp(safeTemp) {
+        document.getElementById('dilatacao-tf').value = safeTemp;
+        document.getElementById('form-dilatacao').submit();
+    }
+
+    const geomSelect = document.getElementById('conducao-geom');
+    function toggleConducaoFields() {
+        if (!geomSelect) return;
+        const isCyl = geomSelect.value === 'cylindrical';
+        document.getElementById('geom-flat-fields').classList.toggle('d-none', isCyl);
+        document.getElementById('geom-cyl-fields').classList.toggle('d-none', !isCyl);
+    }
+    if (geomSelect) geomSelect.addEventListener('change', toggleConducaoFields);
+
+    function applyConducaoFlat(k, area, thick, t1, t2) {
+        geomSelect.value = 'flat';
+        toggleConducaoFields();
+        document.getElementById('conducao-k').value = k;
+        document.getElementById('conducao-area').value = area;
+        document.getElementById('conducao-thick').value = thick;
+        document.getElementById('conducao-t1').value = t1;
+        document.getElementById('conducao-t2').value = t2;
+    }
+
+    function applyConducaoCyl(k, r1, r2, len, t1, t2) {
+        geomSelect.value = 'cylindrical';
+        toggleConducaoFields();
+        document.getElementById('conducao-k').value = k;
+        document.getElementById('conducao-r1').value = r1;
+        document.getElementById('conducao-r2').value = r2;
+        document.getElementById('conducao-len').value = len;
+        document.getElementById('conducao-t1').value = t1;
+        document.getElementById('conducao-t2').value = t2;
+    }
+
+    // Construtor dinâmico de camadas
+    const layersContainer = document.getElementById('layers-container');
+    const btnAddLayer = document.getElementById('btn-add-layer');
+    if (btnAddLayer && layersContainer) {
+        btnAddLayer.addEventListener('click', () => {
+            const count = layersContainer.querySelectorAll('.layer-row').length + 1;
+            const row = document.createElement('div');
+            row.className = 'layer-row p-2 rounded-3 border border-secondary-subtle bg-dark bg-opacity-25';
+            row.innerHTML = `
+                <div class="row g-2 align-items-center">
+                    <div class="col-5">
+                        <input type="text" name="layer_name[]" value="Camada ${count}" class="form-control form-control-sm" required>
+                    </div>
+                    <div class="col-3">
+                        <input type="number" step="any" min="0.0001" name="layer_thickness[]" value="0.05" class="form-control form-control-sm font-mono" required>
+                    </div>
+                    <div class="col-3">
+                        <input type="number" step="any" min="0.0001" name="layer_k[]" value="50.0" class="form-control form-control-sm font-mono" required>
+                    </div>
+                    <div class="col-1 text-end">
+                        <button type="button" class="btn btn-sm btn-outline-danger btn-remove-layer py-0 px-1">×</button>
+                    </div>
+                </div>
+            `;
+            layersContainer.appendChild(row);
+        });
+
+        layersContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('btn-remove-layer')) {
+                if (layersContainer.querySelectorAll('.layer-row').length > 1) {
+                    e.target.closest('.layer-row').remove();
+                } else {
+                    alert('É necessário manter pelo menos 1 camada condutiva.');
+                }
+            }
+        });
+    }
+
+    {% if chart_json %}
+        const calcSpec = {{ chart_json | safe }};
+        Plotly.newPlot('calcChart', calcSpec.data, calcSpec.layout, {responsive: true});
+    {% endif %}
+</script>
+{% endblock %}

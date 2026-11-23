@@ -1,0 +1,180 @@
+{% extends "thermolab/base_thermolab.html" %}
+{% block title %}Comparar Materiais — ThermoLab{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <div class="font-mono text-warning small text-uppercase mb-1" style="letter-spacing: 0.08em;">
+        Funcionalidade 06 • Análise Multicritério (Pandas)
+    </div>
+    <h1 class="page-title mb-1 text-white">Comparação de Desempenho Termofísico</h1>
+    <p class="text-secondary mb-0 small">
+        Compare ligas metálicas e isolantes sob as mesmas condições geométricas e de variação térmica ΔT.
+    </p>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="tl-card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="fw-bold text-white mb-0">Materiais Selecionados</h5>
+                <div class="d-flex gap-1">
+                    <button type="button" class="preset-chip py-1 px-2" onclick="selectAllMats(true)">Todos</button>
+                    <button type="button" class="preset-chip py-1 px-2" onclick="selectAllMats(false)">Limpar</button>
+                </div>
+            </div>
+            <form method="POST" action="{{ url_for('thermolab.comparison') }}">
+                <div class="d-flex flex-column gap-2 mb-3" style="max-height: 290px; overflow-y: auto;">
+                    {% for m in materials %}
+                        {% set vis = mat_visual(m.name, m.category) %}
+                        <label class="cmp-material-card" for="cmp-mat-{{ m.id }}">
+                            <input class="form-check-input m-0 cmp-checkbox" type="checkbox" name="material_ids"
+                                   value="{{ m.id }}" id="cmp-mat-{{ m.id }}"
+                                   {% if m.id in selected_ids %}checked{% endif %}>
+                            <span class="mat-swatch mat-swatch-sm" style="background: {{ vis.bg }};">{{ vis.code }}</span>
+                            <div class="min-w-0 flex-grow-1">
+                                <div class="fw-semibold text-white small text-truncate">{{ m.name }}</div>
+                                <div class="font-mono text-secondary" style="font-size: 0.7rem;">
+                                    k={{ m.thermal_conductivity }} • α={{ "%.1f"|format(m.thermal_expansion * 1e6) }}e-6
+                                </div>
+                            </div>
+                        </label>
+                    {% endfor %}
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label">Massa [kg]</label>
+                        <input type="number" step="any" min="0.001" name="mass" value="{{ params.mass }}" class="form-control form-control-sm font-mono" required>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Comprimento [m]</label>
+                        <input type="number" step="any" min="0.001" name="length" value="{{ params.length }}" class="form-control form-control-sm font-mono" required>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Área [m²]</label>
+                        <input type="number" step="any" min="0.001" name="area" value="{{ params.area }}" class="form-control form-control-sm font-mono" required>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Espessura [m]</label>
+                        <input type="number" step="any" min="0.001" name="thickness" value="{{ params.thickness }}" class="form-control form-control-sm font-mono" required>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Variação de Temperatura ΔT [°C]</label>
+                    <input type="number" step="any" name="delta_t" value="{{ params.delta_t }}" class="form-control font-mono" required>
+                </div>
+                <button type="submit" class="btn btn-thermo w-100">
+                    <i class="bi bi-diagram-3 me-1"></i>Comparar e Salvar Análise
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        {% if comparison_result %}
+            <!-- Destaques -->
+            <div class="row g-3 mb-4">
+                <div class="col-sm-6 col-xl-3">
+                    <div class="tl-kpi-card">
+                        <div class="tl-kpi-label">Melhor Condutor</div>
+                        <div class="my-1">
+                            <span class="metric-hero text-warning fs-3">{{ comparison_result.highlights.best_conductor.value }}</span>
+                            <span class="metric-unit">W/m·K</span>
+                        </div>
+                        <div class="fw-semibold text-white small text-truncate">{{ comparison_result.highlights.best_conductor.name }}</div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-xl-3">
+                    <div class="tl-kpi-card">
+                        <div class="tl-kpi-label">Melhor Isolante</div>
+                        <div class="my-1">
+                            <span class="metric-hero text-info fs-3">{{ comparison_result.highlights.best_insulator.value }}</span>
+                            <span class="metric-unit">W/m·K</span>
+                        </div>
+                        <div class="fw-semibold text-white small text-truncate">{{ comparison_result.highlights.best_insulator.name }}</div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-xl-3">
+                    <div class="tl-kpi-card">
+                        <div class="tl-kpi-label">Menor Dilatação</div>
+                        <div class="my-1">
+                            <span class="metric-hero text-success fs-3">{{ comparison_result.highlights.highest_stability.value }}</span>
+                            <span class="metric-unit">e-6/K</span>
+                        </div>
+                        <div class="fw-semibold text-white small text-truncate">{{ comparison_result.highlights.highest_stability.name }}</div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-xl-3">
+                    <div class="tl-kpi-card">
+                        <div class="tl-kpi-label">Cap. Volumétrica</div>
+                        <div class="my-1">
+                            <span class="metric-hero text-white fs-3">{{ "%.0f"|format(comparison_result.highlights.highest_volumetric_capacity.value) }}</span>
+                            <span class="metric-unit">kJ/m³K</span>
+                        </div>
+                        <div class="fw-semibold text-secondary small text-truncate">{{ comparison_result.highlights.highest_volumetric_capacity.name }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela Comparativa -->
+            <div class="tl-card mb-4">
+                <div class="tl-card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-table text-info me-2"></i>Matriz Comparativa</span>
+                    <span class="font-mono small text-secondary">ΔT = {{ comparison_result.parameters.delta_t_c }} °C</span>
+                </div>
+                <div class="p-3 table-responsive">
+                    <table class="table table-dark-tl table-striped table-sm small mb-0">
+                        <thead>
+                            <tr>
+                                <th>Material</th>
+                                <th class="text-end">k [W/m·K]</th>
+                                <th class="text-end">c [J/kg·K]</th>
+                                <th class="text-end">Q [kJ]</th>
+                                <th class="text-end">ΔL [mm]</th>
+                                <th class="text-end">Q̇ Cond. [W]</th>
+                                <th class="text-end">Dif. [mm²/s]</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in comparison_result.rows %}
+                                {% set vis = mat_visual(row.name, row.category) %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="mat-swatch mat-swatch-sm" style="background: {{ vis.bg }};">{{ vis.code }}</span>
+                                            <span class="fw-semibold text-white">{{ row.name }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="text-end font-mono text-warning fw-semibold">{{ "%.3f"|format(row.thermal_conductivity) }}</td>
+                                    <td class="text-end font-mono">{{ "%.1f"|format(row.specific_heat) }}</td>
+                                    <td class="text-end font-mono">{{ "%.2f"|format(row.sensible_heat_kj) }}</td>
+                                    <td class="text-end font-mono text-info">{{ "%.4f"|format(row.linear_expansion_mm) }}</td>
+                                    <td class="text-end font-mono">{{ "%.1f"|format(row.conduction_rate_w) }}</td>
+                                    <td class="text-end font-mono">{{ "%.2f"|format(row.thermal_diffusivity_mm2s) }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Gráfico Plotly -->
+            <div class="tl-card p-3">
+                <div id="comparisonChart" class="plotly-container"></div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function selectAllMats(state) {
+        document.querySelectorAll('.cmp-checkbox').forEach(cb => { cb.checked = state; });
+    }
+    {% if chart_json %}
+        const cmpSpec = {{ chart_json | safe }};
+        Plotly.newPlot('comparisonChart', cmpSpec.data, cmpSpec.layout, {responsive: true});
+    {% endif %}
+</script>
+{% endblock %}

@@ -1,0 +1,328 @@
+{% extends "thermolab/base_thermolab.html" %}
+{% block title %}Simulações Térmicas — ThermoLab{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <div class="font-mono text-warning small text-uppercase mb-1" style="letter-spacing: 0.08em;">
+        Funcionalidade 07 • Simulador Vetorial (NumPy + Pandas)
+    </div>
+    <h1 class="page-title mb-1 text-white">Simulação de Variações de Temperatura</h1>
+    <p class="text-secondary mb-0 small">
+        Varredura paramétrica estacionária e resposta transiente via Método da Capacitância Global (Newton &amp; Biot).
+    </p>
+</div>
+
+<div class="row g-4">
+    <!-- Formulário de Parâmetros -->
+    <div class="col-lg-4">
+        <div class="tl-card p-3">
+            <h5 class="fw-bold text-white mb-2">Parâmetros da Simulação</h5>
+            <div class="tl-formula-box mb-3">
+                T(t) = T_amb + (T₀ - T_amb)·e^(-t/τ) &nbsp;|&nbsp; Bi = h·L_c/k
+            </div>
+
+            <div class="preset-bar mb-3">
+                <span class="font-mono text-secondary" style="font-size: 0.72rem;">PRESETS:</span>
+                <button type="button" class="preset-chip" onclick="applySimPreset(550, 25, 2.5, 0.45, 1.0, 0.02, 35, 900, 25)">
+                    <i class="bi bi-fire text-warning"></i> Resfriamento Eixo
+                </button>
+                <button type="button" class="preset-chip" onclick="applySimPreset(20, 140, 0.8, 0.65, 0.4, 0.005, 45, 600, 25)">
+                    <i class="bi bi-cpu text-info"></i> Dissipador Rápido
+                </button>
+            </div>
+
+            <form id="sim-form" method="POST" action="{{ url_for('thermolab.simulation') }}">
+                <div class="mb-3">
+                    <label class="form-label">Material *</label>
+                    <select name="material_id" id="sim-mat-select" class="form-select" required>
+                        {% for m in materials %}
+                            <option value="{{ m.id }}" {% if m.id == selected_material_id %}selected{% endif %}>
+                                {{ m.name }} (k={{ m.thermal_conductivity }} W/m·K)
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label">T_inicial T₀ [°C]</label>
+                        <input type="number" step="any" name="temp_start" id="sim-ts" value="{{ form_params.temp_start }}" class="form-control font-mono" required>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">T_final / Amb. [°C]</label>
+                        <input type="number" step="any" name="temp_end" id="sim-te" value="{{ form_params.temp_end }}" class="form-control font-mono" required>
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label">Massa m [kg]</label>
+                        <input type="number" step="any" min="0.001" name="mass" id="sim-mass" value="{{ form_params.mass }}" class="form-control font-mono" required>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Área Superf. A [m²]</label>
+                        <input type="number" step="any" min="0.0001" name="area" id="sim-area" value="{{ form_params.area }}" class="form-control font-mono" required>
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label">Comprimento L [m]</label>
+                        <input type="number" step="any" min="0.001" name="length" id="sim-len" value="{{ form_params.length }}" class="form-control font-mono" required>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Espessura [m]</label>
+                        <input type="number" step="any" min="0.0001" name="thickness" id="sim-thick" value="{{ form_params.thickness }}" class="form-control font-mono" required>
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-4">
+                        <label class="form-label">Conv. h</label>
+                        <input type="number" step="any" min="0.1" name="h_conv" id="sim-h" value="{{ form_params.h_conv }}" class="form-control font-mono" required>
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">t_máx [s]</label>
+                        <input type="number" step="any" min="1" name="sim_time_max" id="sim-tmax" value="{{ form_params.sim_time_max }}" class="form-control font-mono" required>
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">Pontos</label>
+                        <input type="number" min="2" max="200" name="steps" id="sim-steps" value="{{ form_params.steps }}" class="form-control font-mono" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-thermo w-100">
+                    <i class="bi bi-cpu-fill me-1"></i>Executar Simulação
+                </button>
+            </form>
+
+            <div id="sim-inspector" class="material-inspector mt-3">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="font-mono text-warning small fw-bold" id="sim-insp-name">—</span>
+                    <span class="badge bg-secondary bg-opacity-25 text-secondary" id="sim-insp-cat">—</span>
+                </div>
+                <div class="row g-2 font-mono text-secondary" style="font-size: 0.74rem;">
+                    <div class="col-6">k: <span class="text-white" id="sim-insp-k">—</span> W/m·K</div>
+                    <div class="col-6">c: <span class="text-white" id="sim-insp-c">—</span> J/kg·K</div>
+                    <div class="col-6">ρ: <span class="text-white" id="sim-insp-rho">—</span> kg/m³</div>
+                    <div class="col-6">T_máx: <span class="text-white" id="sim-insp-tmax">—</span> °C</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resultados da Simulação -->
+    <div class="col-lg-8">
+        {% if sim_result %}
+            {% set ind = sim_result.physical_indicators %}
+            {% if ind.exceeds_max_temp %}
+                <div class="context-alert mb-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-exclamation-octagon-fill text-danger fs-4"></i>
+                        <div>
+                            <div class="fw-bold text-white small">Faixa térmica ultrapassa T_máx do material ({{ ind.max_temp_c }} °C)</div>
+                            <div class="text-secondary" style="font-size: 0.78rem;">Reduza a temperatura inicial ou final para operação segura.</div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-danger fw-semibold"
+                            onclick="adjustSimTemp({{ (ind.max_temp_c * 0.85)|round(0)|int }})">
+                        Limitar T₀ para {{ (ind.max_temp_c * 0.85)|round(0)|int }} °C
+                    </button>
+                </div>
+            {% endif %}
+
+            {% if not ind.lumped_valid %}
+                <div class="context-alert context-alert-warn mb-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-exclamation-triangle-fill text-warning fs-4"></i>
+                        <div>
+                            <div class="fw-bold text-white small">Número de Biot elevado (Bi = {{ "%.4f"|format(ind.biot_number) }} ≥ 0.1)</div>
+                            <div class="text-secondary" style="font-size: 0.78rem;">Há gradiente térmico interno significativo; aumente a área ou reduza a massa para validar o modelo global.</div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-warning text-dark fw-bold"
+                            onclick="applyThinWallBiot()">
+                        Ajustar Parede Fina (Bi &lt; 0.1)
+                    </button>
+                </div>
+            {% endif %}
+
+            <div class="row g-3 mb-4">
+                <div class="col-sm-3">
+                    <div class="tl-kpi-card">
+                        <div class="tl-kpi-label">Número de Biot</div>
+                        <div class="my-1">
+                            <span class="metric-hero text-warning fs-3">{{ "%.4f"|format(ind.biot_number) }}</span>
+                        </div>
+                        {% if ind.lumped_valid %}
+                            <span class="font-mono badge bg-success bg-opacity-25 text-success">Bi &lt; 0.1 (Exato)</span>
+                        {% else %}
+                            <span class="font-mono badge bg-warning bg-opacity-25 text-warning">Bi ≥ 0.1 (Aprox.)</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="tl-kpi-card">
+                        <div class="tl-kpi-label">Constante τ</div>
+                        <div class="my-1">
+                            <span class="metric-hero text-info fs-3">{{ "%.1f"|format(ind.time_constant_s) }}</span>
+                            <span class="metric-unit">s</span>
+                        </div>
+                        <small class="font-mono text-secondary">{{ "%.2f"|format(ind.time_constant_s / 60.0) }} min</small>
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="tl-kpi-card">
+                        <div class="tl-kpi-label">Equilíbrio 95% (3τ)</div>
+                        <div class="my-1">
+                            <span class="metric-hero text-success fs-3">{{ "%.1f"|format(ind.time_95_percent_s) }}</span>
+                            <span class="metric-unit">s</span>
+                        </div>
+                        <small class="font-mono text-secondary">{{ "%.2f"|format(ind.time_95_percent_s / 60.0) }} min</small>
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="tl-kpi-card">
+                        <div class="tl-kpi-label">Temp. em t_máx</div>
+                        <div class="my-1">
+                            <span class="metric-hero text-white fs-3">{{ "%.1f"|format(ind.final_transient_temp_c) }}</span>
+                            <span class="metric-unit">°C</span>
+                        </div>
+                        <small class="font-mono text-secondary">L_c = {{ "%.4f"|format(ind.characteristic_length_m) }} m</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tl-card p-3 mb-4">
+                <div id="simulationChart" class="plotly-container"></div>
+            </div>
+
+            <!-- Tabelas Numéricas (Pandas) -->
+            <div class="tl-card">
+                <div class="tl-card-header">
+                    <ul class="nav nav-pills card-header-pills" role="tablist">
+                        <li class="nav-item">
+                            <button class="nav-link active btn-sm py-1" data-bs-toggle="pill" data-bs-target="#sim-trans-table" type="button">
+                                Série Transiente T(t)
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link btn-sm py-1" data-bs-toggle="pill" data-bs-target="#sim-param-table" type="button">
+                                Série Paramétrica T
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                <div class="p-3 tab-content">
+                    <div class="tab-pane fade show active table-responsive" id="sim-trans-table" style="max-height: 290px;">
+                        <table class="table table-dark-tl table-striped table-sm small mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Passo</th>
+                                    <th class="text-end">Tempo [s]</th>
+                                    <th class="text-end">Temperatura T(t) [°C]</th>
+                                    <th class="text-end">Taxa Convectiva Q̇(t) [W]</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for r in sim_result.transient_records %}
+                                    <tr>
+                                        <td class="font-mono">{{ r.step }}</td>
+                                        <td class="text-end font-mono">{{ "%.2f"|format(r.time_s) }}</td>
+                                        <td class="text-end font-mono text-warning fw-semibold">{{ "%.2f"|format(r.temp_c) }}</td>
+                                        <td class="text-end font-mono text-info">{{ "%.2f"|format(r.heat_rate_w) }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="tab-pane fade table-responsive" id="sim-param-table" style="max-height: 290px;">
+                        <table class="table table-dark-tl table-striped table-sm small mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Passo</th>
+                                    <th class="text-end">Temp. [°C]</th>
+                                    <th class="text-end">ΔT [°C]</th>
+                                    <th class="text-end">Calor Q [kJ]</th>
+                                    <th class="text-end">Dilatação ΔL [mm]</th>
+                                    <th class="text-end">Condução Q̇ [W]</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for r in sim_result.parametric_records %}
+                                    <tr>
+                                        <td class="font-mono">{{ r.step }}</td>
+                                        <td class="text-end font-mono">{{ "%.2f"|format(r.temp_c) }}</td>
+                                        <td class="text-end font-mono">{{ "%.2f"|format(r.delta_t_c) }}</td>
+                                        <td class="text-end font-mono text-info">{{ "%.3f"|format(r.heat_kj) }}</td>
+                                        <td class="text-end font-mono text-success">{{ "%.4f"|format(r.delta_l_mm) }}</td>
+                                        <td class="text-end font-mono text-warning">{{ "%.2f"|format(r.conduction_w) }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="tl-card p-5 text-center text-secondary">
+                <i class="bi bi-graph-up fs-1 text-info mb-3 d-block"></i>
+                <h5 class="text-white fw-bold">Simulador Térmico Pronto</h5>
+                <p class="small mb-3">
+                    Selecione o material e a faixa térmica ao lado ou execute um preset de engenharia agora mesmo.
+                </p>
+                <button type="button" class="btn btn-sm btn-outline-info"
+                        onclick="applySimPreset(550, 25, 2.5, 0.45, 1.0, 0.02, 35, 900, 25); document.getElementById('sim-form').submit();">
+                    <i class="bi bi-play-circle me-1"></i>Simular Resfriamento Agora
+                </button>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const simMats = {{ materials_json | tojson }};
+    const simMap = {};
+    simMats.forEach(m => { simMap[String(m.id)] = m; });
+
+    const simSelect = document.getElementById('sim-mat-select');
+    function updateSimInspector() {
+        const m = simMap[simSelect.value];
+        if (!m) return;
+        document.getElementById('sim-insp-name').textContent = m.name;
+        document.getElementById('sim-insp-cat').textContent = m.category;
+        document.getElementById('sim-insp-k').textContent = m.thermal_conductivity;
+        document.getElementById('sim-insp-c').textContent = m.specific_heat;
+        document.getElementById('sim-insp-rho').textContent = m.density;
+        document.getElementById('sim-insp-tmax').textContent = m.max_temp ?? '—';
+    }
+    simSelect.addEventListener('change', updateSimInspector);
+    updateSimInspector();
+
+    function applySimPreset(ts, te, mass, area, len, thick, h, tmax, steps) {
+        document.getElementById('sim-ts').value = ts;
+        document.getElementById('sim-te').value = te;
+        document.getElementById('sim-mass').value = mass;
+        document.getElementById('sim-area').value = area;
+        document.getElementById('sim-len').value = len;
+        document.getElementById('sim-thick').value = thick;
+        document.getElementById('sim-h').value = h;
+        document.getElementById('sim-tmax').value = tmax;
+        document.getElementById('sim-steps').value = steps;
+    }
+
+    function adjustSimTemp(safeTemp) {
+        document.getElementById('sim-ts').value = safeTemp;
+        document.getElementById('sim-form').submit();
+    }
+
+    function applyThinWallBiot() {
+        document.getElementById('sim-mass').value = 0.5;
+        document.getElementById('sim-area').value = 1.2;
+        document.getElementById('sim-h').value = 12;
+        document.getElementById('sim-form').submit();
+    }
+
+    {% if chart_json %}
+        const simSpec = {{ chart_json | safe }};
+        Plotly.newPlot('simulationChart', simSpec.data, simSpec.layout, {responsive: true});
+    {% endif %}
+</script>
+{% endblock %}
