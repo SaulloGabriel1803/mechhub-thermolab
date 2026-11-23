@@ -455,6 +455,15 @@ body.thermolab-body {
     min-height: 390px;
 }
 
+.js-plotly-plot .plotly .modebar {
+    top: 8px !important;
+    right: 6px !important;
+    border: 1px solid var(--border-subtle);
+    border-radius: 0.45rem;
+    padding: 3px 2px;
+    backdrop-filter: blur(8px);
+}
+
 .page-title {
     font-weight: 700;
     letter-spacing: -0.025em;

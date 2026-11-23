@@ -174,7 +174,7 @@
     }
     {% if chart_json %}
         const cmpSpec = {{ chart_json | safe }};
-        Plotly.newPlot('comparisonChart', cmpSpec.data, cmpSpec.layout, {responsive: true});
+        Plotly.newPlot('comparisonChart', cmpSpec.data, cmpSpec.layout, {responsive: true, displaylogo: false});
     {% endif %}
 </script>
 {% endblock %}

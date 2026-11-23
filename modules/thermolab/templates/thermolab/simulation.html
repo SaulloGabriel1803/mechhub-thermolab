@@ -322,7 +322,7 @@
 
     {% if chart_json %}
         const simSpec = {{ chart_json | safe }};
-        Plotly.newPlot('simulationChart', simSpec.data, simSpec.layout, {responsive: true});
+        Plotly.newPlot('simulationChart', simSpec.data, simSpec.layout, {responsive: true, displaylogo: false});
     {% endif %}
 </script>
 {% endblock %}

@@ -722,7 +722,7 @@
 
     {% if chart_json %}
         const calcSpec = {{ chart_json | safe }};
-        Plotly.newPlot('calcChart', calcSpec.data, calcSpec.layout, {responsive: true});
+        Plotly.newPlot('calcChart', calcSpec.data, calcSpec.layout, {responsive: true, displaylogo: false});
     {% endif %}
 </script>
 {% endblock %}

@@ -22,7 +22,13 @@ _DARK_LAYOUT = dict(
     font=dict(family="JetBrains Mono, Plus Jakarta Sans, sans-serif", color="#e4e4e7", size=11.5),
     title_font=dict(family="Plus Jakarta Sans, sans-serif", size=13.5, color="#fafafa"),
     title_y=0.97,
-    margin=dict(l=58, r=28, t=54, b=52),
+    margin=dict(l=58, r=52, t=54, b=52),
+    modebar=dict(
+        orientation="v",
+        bgcolor="rgba(18, 18, 21, 0.88)",
+        color="#71717a",
+        activecolor="#f97316",
+    ),
     hovermode="x unified",
     hoverlabel=dict(
         bgcolor="#18181c",
@@ -181,7 +187,7 @@ def build_resistance_chart(result: dict[str, Any]) -> str:
         col=2,
     )
 
-    layout_cfg = {**_DARK_LAYOUT, "margin": dict(l=54, r=24, t=44, b=64)}
+    layout_cfg = {**_DARK_LAYOUT, "margin": dict(l=54, r=52, t=44, b=64)}
     fig.update_layout(**layout_cfg, showlegend=False, height=390)
     fig.update_annotations(font_size=12, font_color="#e4e4e7")
     fig.update_xaxes(title_text="Espessura (m)", row=1, col=1)
@@ -242,7 +248,7 @@ def build_comparison_charts(comparison_result: dict[str, Any]) -> str:
         col=3,
     )
 
-    layout_cfg = {**_DARK_LAYOUT, "margin": dict(l=52, r=22, t=42, b=78)}
+    layout_cfg = {**_DARK_LAYOUT, "margin": dict(l=52, r=52, t=42, b=78)}
     fig.update_layout(**layout_cfg, showlegend=False, height=380)
     fig.update_annotations(font_size=12, font_color="#e4e4e7")
     fig.update_xaxes(tickangle=-25)
@@ -305,7 +311,7 @@ def build_simulation_charts(simulation_result: dict[str, Any]) -> str:
         secondary_y=True,
     )
 
-    layout_cfg = {**_DARK_LAYOUT, "margin": dict(l=54, r=54, t=44, b=66)}
+    layout_cfg = {**_DARK_LAYOUT, "margin": dict(l=54, r=96, t=44, b=66)}
     fig.update_layout(
         **layout_cfg,
         height=395,
