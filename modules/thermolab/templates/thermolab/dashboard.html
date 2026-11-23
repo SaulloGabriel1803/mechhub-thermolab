@@ -104,11 +104,11 @@
                 <span><i class="bi bi-palette2 text-warning me-2"></i>Acesso Direto por Material</span>
                 <a href="{{ url_for('thermolab.materials') }}" class="font-mono small text-secondary text-decoration-none">Ver todos →</a>
             </div>
-            <div class="p-3 d-flex flex-column gap-2" style="max-height: 410px; overflow-y: auto;">
+            <div class="p-3 d-flex flex-column gap-2" style="max-height: 410px; overflow-y: auto; overflow-x: hidden;">
                 {% for m in materials_showcase %}
                     {% set vis = mat_visual(m.name, m.category) %}
                     {% set k_pct = ((m.thermal_conductivity / max_k) * 100) if max_k > 0 else 0 %}
-                    <div class="p-2 rounded-3 border border-secondary-subtle bg-dark bg-opacity-25 d-flex align-items-center justify-content-between gap-2">
+                    <div class="p-2 rounded-3 border border-secondary-subtle bg-dark bg-opacity-25 d-flex align-items-center justify-content-between gap-2 tl-material-row">
                         <div class="d-flex align-items-center gap-2 min-w-0 flex-grow-1">
                             <span class="mat-swatch" style="background: {{ vis.bg }};">{{ vis.code }}</span>
                             <div class="min-w-0 flex-grow-1">

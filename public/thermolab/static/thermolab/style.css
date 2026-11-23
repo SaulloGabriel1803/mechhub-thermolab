@@ -46,6 +46,15 @@ body.thermolab-body {
     font-variant-numeric: tabular-nums;
 }
 
+.min-w-0 {
+    min-width: 0 !important;
+}
+
+.tl-material-row {
+    min-width: 0;
+    overflow: hidden;
+}
+
 /* Topbar de Comando */
 .mechhub-topbar {
     background: rgba(12, 12, 14, 0.88);
@@ -439,6 +448,8 @@ body.thermolab-body {
     display: flex;
     align-items: center;
     gap: 0.6rem;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .cmp-material-card:hover {

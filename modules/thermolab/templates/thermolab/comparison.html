@@ -23,7 +23,7 @@
                 </div>
             </div>
             <form method="POST" action="{{ url_for('thermolab.comparison') }}">
-                <div class="d-flex flex-column gap-2 mb-3" style="max-height: 290px; overflow-y: auto;">
+                <div class="d-flex flex-column gap-2 mb-3" style="max-height: 290px; overflow-y: auto; overflow-x: hidden;">
                     {% for m in materials %}
                         {% set vis = mat_visual(m.name, m.category) %}
                         <label class="cmp-material-card" for="cmp-mat-{{ m.id }}">
